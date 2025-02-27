@@ -2,6 +2,8 @@ import os
 import discord
 import random
 import subprocess
+import asyncio
+
 from dotenv import load_dotenv
 from discord.ext import commands
 from pythonping import ping
@@ -19,52 +21,36 @@ async def configure(ctx):
 
 @client.command()
 async def rotateip(ctx):
+    await ctx.send("Changing IP address, give me a minute or so.")
+
+    channel_id = ctx.channel.id
     try:
-        # get the current IP address
-        ip_address = subprocess.check_output(["hostname", "-I"], text=True)
-        netmask = "16"
-        gateway = subprocess.check_output("route -n | grep 'UG[ \\t]' | awk '{print $2}'", shell=True, text=True).strip()
-        interface = subprocess.check_output("ip route | grep default | awk '{print $5}'", shell=True, text=True).strip()
-        print(f"[i] Current IP: {ip_address}")
-        print(f"[i] Default gateway: {gateway}")
-
-        while True:
-            # generate a random IP address within the network (/16)
-            third_octet = random.randint(200,255)
-            fourth_octet = random.randint(200,254)
-            x = ip_address.split(".")
-            x[2] = str(third_octet)
-            x[3] = str(fourth_octet)
-            new_ip = ".".join(x)
-
-            # check if IP address already exists on the network
-            print(f"[i] Checking if {new_ip} exists on the network...")
-            ping_results = ping(new_ip, timeout=2, count=3)
-            
-            results_list = []
-            for results in ping_results:
-                results_list.append(results.message)
-
-            if (all(i == None for i in results_list)):
-
-                subprocess.run(f"ifconfig eth0 {new_ip}", check=True)
-                
-                # subprocess.run(['ip', 'addr', 'flush', 'dev', interface], check=True)
-                # subprocess.run(['ip', 'addr', 'add', f'{new_ip}/16', 'dev', interface], check=True)
-                # subprocess.run(['ip', 'link', 'set', 'up', 'dev', interface], check=True)
-                # subprocess.run(['ip', 'route', 'add', 'default', 'via', gateway], check=True)
-
-                print(f"[+] New IP: {new_ip}")
-                await ctx.send(f"New IP configured: {new_ip}")
-                break
-            else:
-                print(f"[!] Error! {new_ip} already exists on the network") 
-                 
-
+        subprocess.Popen(["python3", "change_ip_and_restart.py", str(channel_id)]) 
+        await client.close()
     except Exception as e:
         print(e)
-        await ctx.send(f"An error occured: {e}")
+        await ctx.send(f"An error occurred: {e}")
 
+@client.event
+async def on_ready():
+    print(f'{client.user} has connected to Discord!')
     
+    # Check if we just changed IP by looking for our info file
+    if os.path.exists("ip_change_info.txt"):
+        try:
+            with open("ip_change_info.txt", "r") as f:
+                lines = f.readlines()
+                channel_id = int(lines[0].strip())
+                new_ip = lines[1].strip()
+            
+            # Send confirmation to the original channel
+            channel = client.get_channel(channel_id)
+            if channel:
+                await channel.send(f"IP change complete! New IP: {new_ip}")
+            
+            # Clean up the file
+            os.remove("ip_change_info.txt")
+        except Exception as e:
+            print(f"Error during reconnection notification: {e}")
 
 client.run(TOKEN)
