@@ -7,7 +7,7 @@ from pythonping import ping
 def get_network_info():
     
     interface = subprocess.check_output("ip route | grep default | awk '{print $5}'", shell=True, text=True).strip()
-    ip_cidr = subprocess.check_output(f"ip -o -f inet addr show | grep {interface} | awk '/scope global/ {print $4}'", shell=True, text=True).split("/")
+    ip_cidr = subprocess.check_output(f"ip -o -f inet addr show | grep {interface} | awk '/scope global/ {{print $4}}'", shell=True, text=True).split("/")
     default_gateway = subprocess.check_output("route -n | grep 'UG[ \\t]' | awk '{print $2}'", shell=True, text=True).strip()
     netmask = ip_cidr[1].strip()
 
